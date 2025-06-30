@@ -58,7 +58,19 @@ async function run() {
       res.send(result);
     });
 
-    
+        // DELETE data by ID
+    app.delete('/datas/:id', async (req, res) => {
+      const id = req.params.id;
+      try {
+        const result = await datasCollection.deleteOne({ _id: new ObjectId(id) });
+        res.send(result);
+      } finally {
+        
+      }
+    });
+
+
+
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
