@@ -32,7 +32,11 @@ async function run() {
        const db = client.db('dataDb');
     const dataCollection = db.collection('datas');
 
-   
+        // GET all data
+    app.get('/datas', async (req, res) => {
+      const result = await dataCollection.find().toArray();
+      res.send(result);
+    });
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
