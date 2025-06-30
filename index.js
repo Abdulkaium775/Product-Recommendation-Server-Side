@@ -45,7 +45,8 @@ async function run() {
       res.send(result);
     });
 
-        app.put('/datas/:id', async (req, res) => {
+        // PUT to update data by ID
+    app.put('/datas/:id', async (req, res) => {
       const id = req.params.id;
       const filter = { _id: new ObjectId(id) };
       const update = req.body;
@@ -56,6 +57,8 @@ async function run() {
       const result = await datasCollection.updateOne(filter, updateDoc, options);
       res.send(result);
     });
+
+    
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
