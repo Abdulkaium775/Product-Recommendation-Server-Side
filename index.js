@@ -1,52 +1,50 @@
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 
-dotenv.config();  
+dotenv.config();
 
 const app = express();
 const port = process.env.PORT || 3000;
 
+// Middleware
 app.use(cors());
 app.use(express.json());
 
-
-
+// MongoDB URI
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.7ky75a3.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
-// Create a MongoClient with a MongoClientOptions object to set the Stable API version
 const client = new MongoClient(uri, {
   serverApi: {
     version: ServerApiVersion.v1,
     strict: true,
     deprecationErrors: true,
-  }
+  },
 });
 
 async function run() {
   try {
-    // Connect the client to the server	(optional starting in v4.7)
     await client.connect();
-    
-       const db = client.db('dataDb');
-    const dataCollection = db.collection('datas');
 
-        // GET all data
-    app.get('/datas', async (req, res) => {
+    const db = client.db('productDb');
+    const dataCollection = db.collection('products');
+
+    // GET all products
+    app.get('/products', async (req, res) => {
       const result = await dataCollection.find().toArray();
       res.send(result);
     });
 
-    // POST new data
-    app.post('/datas', async (req, res) => {
-      const newData = req.body;
-      const result = await datasCollection.insertOne(newData);
+    // POST a new product
+    app.post('/products', async (req, res) => {
+      const newProduct = req.body;
+      const result = await dataCollection.insertOne(newProduct);
       res.send(result);
     });
 
-        // PUT to update data by ID
-    app.put('/datas/:id', async (req, res) => {
+    // PUT (Update) a product by ID
+    app.put('/products/:id', async (req, res) => {
       const id = req.params.id;
       const filter = { _id: new ObjectId(id) };
       const update = req.body;
@@ -54,40 +52,32 @@ async function run() {
       const updateDoc = {
         $set: update,
       };
-      const result = await datasCollection.updateOne(filter, updateDoc, options);
+      const result = await dataCollection.updateOne(filter, updateDoc, options);
       res.send(result);
     });
 
-        // DELETE data by ID
-    app.delete('/datas/:id', async (req, res) => {
+    // DELETE a product by ID
+    app.delete('/products/:id', async (req, res) => {
       const id = req.params.id;
-      try {
-        const result = await datasCollection.deleteOne({ _id: new ObjectId(id) });
-        res.send(result);
-      } finally {
-        
-      }
+      const result = await dataCollection.deleteOne({ _id: new ObjectId(id) });
+      res.send(result);
     });
 
-
-
-
-    // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
-    console.log("Pinged your deployment. You successfully connected to MongoDB!");
-  } finally {
-    // Ensures that the client will close when you finish/error
-    await client.close();
+    console.log("Connected to MongoDB!");
+  } catch (error) {
+    console.error("MongoDB connection error:", error);
   }
 }
+
 run().catch(console.dir);
 
-
-
+// Default route
 app.get('/', (req, res) => {
   res.send('Hello World!');
 });
 
+// Start server
 app.listen(port, () => {
-  console.log(`Example app listening on port ${port}`);
+  console.log(`Server running at http://localhost:${port}`);
 });
