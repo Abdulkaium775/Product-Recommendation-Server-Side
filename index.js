@@ -36,6 +36,23 @@ async function run() {
       res.send(result);
     });
 
+    // GET a product by ID
+app.get('/products/:id', async (req, res) => {
+  const id = req.params.id;
+
+  try {
+    const product = await dataCollection.findOne({ _id: new ObjectId(id) });
+    if (!product) {
+      return res.status(404).json({ error: 'Query not found' });
+    }
+    res.json(product);
+  } catch (error) {
+    console.error('Error fetching product by ID:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+
     // POST a new product
     app.post('/products', async (req, res) => {
       const newProduct = req.body;
