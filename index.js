@@ -25,7 +25,7 @@ const client = new MongoClient(uri, {
 
 async function run() {
   try {
-    // await client.connect();
+    await client.connect();
 
     const db = client.db('productDb');
     const dataCollection = db.collection('products');
@@ -35,8 +35,13 @@ async function run() {
 
     // GET all products
     app.get('/products', async (req, res) => {
-      const result = await dataCollection.find().toArray();
-      res.send(result);
+      try {
+        const result = await dataCollection.find().toArray();
+        res.send(result);
+      } catch (err) {
+        console.error('Error fetching products:', err);
+        res.status(500).json({ error: 'Server error' });
+      }
     });
 
     // GET a product by ID
@@ -44,7 +49,7 @@ async function run() {
       const id = req.params.id;
       try {
         const product = await dataCollection.findOne({ _id: new ObjectId(id) });
-        if (!product) return res.status(404).json({ error: 'Query not found' });
+        if (!product) return res.status(404).json({ error: 'Product not found' });
         res.json(product);
       } catch (error) {
         console.error('Error fetching product by ID:', error);
@@ -55,8 +60,13 @@ async function run() {
     // POST a new product
     app.post('/products', async (req, res) => {
       const newProduct = req.body;
-      const result = await dataCollection.insertOne(newProduct);
-      res.send(result);
+      try {
+        const result = await dataCollection.insertOne(newProduct);
+        res.send(result);
+      } catch (err) {
+        console.error('Error adding product:', err);
+        res.status(500).json({ error: 'Server error' });
+      }
     });
 
     // PUT (Update) a product by ID
@@ -66,15 +76,25 @@ async function run() {
       const update = req.body;
       const options = { upsert: true };
       const updateDoc = { $set: update };
-      const result = await dataCollection.updateOne(filter, updateDoc, options);
-      res.send(result);
+      try {
+        const result = await dataCollection.updateOne(filter, updateDoc, options);
+        res.send(result);
+      } catch (err) {
+        console.error('Error updating product:', err);
+        res.status(500).json({ error: 'Server error' });
+      }
     });
 
     // DELETE a product by ID
     app.delete('/products/:id', async (req, res) => {
       const id = req.params.id;
-      const result = await dataCollection.deleteOne({ _id: new ObjectId(id) });
-      res.send(result);
+      try {
+        const result = await dataCollection.deleteOne({ _id: new ObjectId(id) });
+        res.send(result);
+      } catch (err) {
+        console.error('Error deleting product:', err);
+        res.status(500).json({ error: 'Server error' });
+      }
     });
 
     // --- RECOMMENDATIONS ROUTES ---
@@ -82,12 +102,13 @@ async function run() {
     // GET all recommendations by recommenderEmail (query param: ?email=)
     app.get('/recommendations', async (req, res) => {
       const email = req.query.email;
+      if (!email) return res.status(400).json({ error: 'Missing email query parameter' });
       try {
         const result = await recommendationCollection.find({ recommenderEmail: email }).toArray();
         res.send(result);
       } catch (err) {
         console.error('Error fetching recommendations:', err);
-        res.status(500).json({ error: 'Server Error' });
+        res.status(500).json({ error: 'Server error' });
       }
     });
 
@@ -105,7 +126,7 @@ async function run() {
         res.send(result);
       } catch (err) {
         console.error('Error adding recommendation:', err);
-        res.status(500).json({ error: 'Server Error' });
+        res.status(500).json({ error: 'Server error' });
       }
     });
 
@@ -131,21 +152,51 @@ async function run() {
       }
     });
 
-    // GET recommendations made by others on queries posted by the logged-in user
+    // GET recommendations made by others on queries posted by the logged-in user,
+    // enriched with product/query details for display
     app.get('/myqueries/recommendations', async (req, res) => {
       const userEmail = req.query.email;
       if (!userEmail) return res.status(400).json({ error: 'Missing user email' });
 
       try {
+        // Find all queries posted by user
         const userQueries = await dataCollection.find({ userEmail }).project({ _id: 1 }).toArray();
         const queryIds = userQueries.map((q) => q._id);
 
         if (queryIds.length === 0) return res.json([]);
 
-        const recommendations = await recommendationCollection.find({
-          queryId: { $in: queryIds },
-          recommenderEmail: { $ne: userEmail },
-        }).toArray();
+        // Aggregate recommendations made by others on user's queries,
+        // plus query details via lookup
+        const recommendations = await recommendationCollection.aggregate([
+          {
+            $match: {
+              queryId: { $in: queryIds },
+              recommenderEmail: { $ne: userEmail },
+            },
+          },
+          {
+            $lookup: {
+              from: 'products',
+              localField: 'queryId',
+              foreignField: '_id',
+              as: 'queryDetails',
+            },
+          },
+          {
+            $unwind: '$queryDetails',
+          },
+          {
+            $project: {
+              _id: 1,
+              recommenderEmail: 1,
+              boycottingReason: 1,
+              recommendationText: 1,
+              createdAt: 1,
+              'queryDetails.productName': 1,
+              'queryDetails.queryTitle': 1,
+            },
+          },
+        ]).toArray();
 
         res.json(recommendations);
       } catch (err) {
@@ -154,8 +205,7 @@ async function run() {
       }
     });
 
-    // await client.db('admin').command({ ping: 1 });
-    // console.log('Connected to MongoDB!');
+    console.log('Connected to MongoDB and routes are set up.');
   } catch (error) {
     console.error('MongoDB connection error:', error);
   }
